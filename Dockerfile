@@ -13,8 +13,18 @@ RUN npm run build
 FROM php:8.5-cli
 
 RUN apt-get update && apt-get install -y \
-    git unzip zip libzip-dev libpng-dev libonig-dev libxml2-dev \
-    && docker-php-ext-install pdo_mysql mbstring zip exif
+    git unzip zip \
+    libzip-dev \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
+ && docker-php-ext-install \
+    pdo_mysql \
+    mbstring \
+    zip \
+    exif \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
@@ -22,12 +32,27 @@ WORKDIR /var/www/html
 
 COPY . .
 
-RUN composer install --no-dev --optimize-autoloader
-
+# انسخ ملفات Vite
 COPY --from=frontend /app/public/build ./public/build
 
-RUN mkdir -p storage/framework/{cache,sessions,views} storage/logs bootstrap/cache \
-    && chmod -R 777 storage bootstrap/cache
+# أنشئ مجلدات Laravel قبل Composer
+RUN mkdir -p \
+    bootstrap/cache \
+    storage/framework/cache \
+    storage/framework/sessions \
+    storage/framework/views \
+    storage/logs
+
+RUN chmod -R 777 storage bootstrap/cache
+
+# منع تشغيل artisan أثناء composer
+RUN composer install \
+    --no-dev \
+    --optimize-autoloader \
+    --no-scripts
+
+# ثم شغّل سكربتات Laravel
+RUN php artisan package:discover --ansi
 
 EXPOSE 8080
 
